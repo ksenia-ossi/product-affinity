@@ -69,9 +69,6 @@ def main() -> None:
     report("ALS matrix factorisation", als_scores(d["user_aisle"], te), time.time() - t)
 
     t = time.time()
-    # TODO(ksenia): try lgb.LGBMRanker(objective="lambdarank") with group = candidates per user and
-    # compare NDCG@10 with this pointwise classifier. Then tune num_leaves / learning_rate on a
-    # validation split of TRAIN USERS (never on the test users).
     clf = lgb.LGBMClassifier(n_estimators=400, learning_rate=0.05, num_leaves=63, min_child_samples=100,
                              subsample=0.8, subsample_freq=1, colsample_bytree=0.8, random_state=SEED, verbose=-1)
     X_cols = FEATURES + ["aisle_id"]

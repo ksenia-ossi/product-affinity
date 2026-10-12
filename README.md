@@ -80,7 +80,7 @@ Requires Python ≥ 3.10 and Docker (for PostgreSQL). Peak RAM ≈ 5 GB.
 ## Next steps
 
 - [ ] Replace the pointwise classifier with `LGBMRanker` (lambdarank, one group per user) and
-      compare NDCG@10 — `TODO(ksenia)` in `train.py`.
+      compare NDCG@10.
 - [ ] Feed the ALS score to LightGBM as a feature instead of using it standalone (classic
       two-stage recommender: candidates + learned re-ranker).
 - [ ] Go one level deeper: predict *products* (50k items) instead of aisles — the regime where
