@@ -1,0 +1,90 @@
+# Product-category affinity prediction — which categories will a user buy next?
+
+End-to-end recommender pipeline on the public
+[Instacart Online Grocery Shopping Dataset 2017](https://www.kaggle.com/c/instacart-market-basket-analysis)
+(3.4M orders, 206k users, 50k products in 134 aisles / 21 departments, 34M order lines).
+
+**Business question:** given a user's purchase history, how strongly is she attracted to each
+product category (*aisle*)? Ranking the 134 aisles per user is the building block behind
+"recommend a category / brand to this user" and category-level ad targeting.
+
+```
+CSVs ──> PostgreSQL (COPY, SQL exploration + aggregation) ──> parquet ──> pandas EDA ──> candidates ──> rankers ──> top-k metrics
+```
+
+## Results (26k held-out users, aisles ranked for each user's next order)
+
+| model                                         | precision@5 | recall@10 | NDCG@10 | hit-rate@10 | AUC   |
+|:----------------------------------------------|------------:|----------:|--------:|------------:|------:|
+| popularity (same list for everyone)           | 0.372       | 0.393     | 0.429   | 0.885       | –     |
+| user history (share of past orders)           | 0.512       | 0.580     | 0.609   | 0.960       | –     |
+| ALS matrix factorisation (`implicit`)         | 0.334       | 0.476     | 0.427   | 0.930       | –     |
+| LightGBM on history + recency + popularity    | **0.529**   | **0.594** | **0.626** | **0.963** | 0.832 |
+
+Full tables: [reports/metrics.md](reports/metrics.md) · SQL: [reports/sql_exploration.md](reports/sql_exploration.md) · EDA: [reports/eda.md](reports/eda.md)
+
+![P(buy aisle next) vs history](reports/figures/history_vs_label.png)
+
+## What I learned from the data (SQL + pandas)
+
+- **Repeat behaviour dominates.** 80.8% of the aisles in a user's next order were already in her
+  history (SQL: `repeat_share_in_target_order`). A per-user "share of past orders containing the
+  aisle" is therefore a very strong baseline — it beats collaborative filtering by a wide margin.
+- **Recency matters on top of frequency.** P(buy aisle next) is 0.43 if the aisle was in the last
+  order and falls to 0.05 after 9+ orders without it; it rises monotonically from 0.06 to 0.75 with
+  the share of past orders containing it (figure above). Both are features of the LightGBM model.
+- **Popularity is a Pareto distribution.** `fresh fruits` is in 56% of all orders, the median aisle
+  in ~2%. Popularity alone already gives hit-rate@10 = 0.88, so every model must be compared to it.
+- **Habit ≠ popularity.** Reorder rate ranges from 0.67 (dairy eggs) to 0.32 (personal care):
+  some categories are routine, others are one-off purchases — the aisle-level `a_reorder_rate` feature.
+- **Why ALS underperforms here:** with only 134 items and strongly repetitive users, the user's own
+  history is far more informative than "similar users"; factorisation shines when the catalogue is
+  large and sparse (products, not aisles). See *Next steps*.
+- **Evaluation design.** Split by *user* (train rankers on 105k users, evaluate on 26k unseen users)
+  and by *time* within each user (history = all prior orders, target = most recent order), so no
+  information from the target order leaks into the features. Recall is computed against *all*
+  positives, including aisles that never made it into the candidate list.
+
+## Repository layout
+
+```
+src/affinity/
+  config.py       paths, evaluation cut-offs, split settings
+  download.py     fetch the six CSVs from a Hugging Face mirror
+  db.py           PostgreSQL schema + COPY (34M rows in ~25 s), exploration SQL -> Markdown,
+                  feature SQL -> parquet
+  sql/            schema.sql, explore.sql, features.sql (user x aisle history/recency aggregates)
+  features.py     candidate generation (history ∪ top-20 popular), user-level split, labels
+  metrics.py      precision@k, recall@k, NDCG@k, hit-rate@k
+  eda.py          pandas/Matplotlib EDA -> reports/eda.md + figures
+  train.py        popularity, user-history, ALS, LightGBM; results table + figures
+tests/            pytest for metrics and candidate construction
+reports/          generated tables and figures
+```
+
+## Run it
+
+```bash
+pip install -r requirements.txt
+make data        # ~700 MB of CSVs
+make db-load     # docker compose up + schema + COPY into PostgreSQL
+make sql         # exploration queries -> reports/sql_exploration.md
+make features    # SQL aggregation -> data/processed/*.parquet (~1.5 min)
+make eda         # figures + reports/eda.md
+make train       # four rankers -> reports/metrics.md (~1 min on 8 cores)
+make test
+```
+
+Requires Python ≥ 3.10 and Docker (for PostgreSQL). Peak RAM ≈ 5 GB.
+
+## Next steps
+
+- [ ] Replace the pointwise classifier with `LGBMRanker` (lambdarank, one group per user) and
+      compare NDCG@10 — `TODO(ksenia)` in `train.py`.
+- [ ] Feed the ALS score to LightGBM as a feature instead of using it standalone (classic
+      two-stage recommender: candidates + learned re-ranker).
+- [ ] Go one level deeper: predict *products* (50k items) instead of aisles — the regime where
+      matrix factorisation and item-item similarity become useful.
+- [ ] Add a cold-start evaluation: users with ≤ 5 orders only.
+- [ ] Calibrate the LightGBM probabilities (reliability curve) so that scores are usable as
+      affinity *probabilities*, not only for ranking.

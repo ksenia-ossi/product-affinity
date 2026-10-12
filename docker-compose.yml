@@ -1,0 +1,12 @@
+services:
+  db:
+    image: postgres:16
+    container_name: affinity-pg
+    environment:
+      POSTGRES_USER: instacart
+      POSTGRES_PASSWORD: instacart
+      POSTGRES_DB: instacart
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./data/raw:/data:ro
