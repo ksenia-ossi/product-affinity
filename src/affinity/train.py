@@ -1,4 +1,4 @@
-"""Rank the 134 aisles for each held-out user; report precision/recall/NDCG/hit-rate @5 and @10.
+"""Rank candidate aisles for each held-out user; report retrieval and top-k metrics.
 
 Models, in order of complexity:
 1. Popularity          score = global share of orders containing the aisle  (same list for everyone)
@@ -21,7 +21,7 @@ from sklearn.metrics import log_loss, roc_auc_score
 
 from .config import FIGURES, K_EVAL, REPORTS, SEED
 from .features import CATEGORICAL, FEATURES, build_candidates, load_processed, positives_per_user, split_users
-from .metrics import evaluate
+from .metrics import candidate_metrics, evaluate
 
 
 def als_scores(ua: pd.DataFrame, cand: pd.DataFrame, factors=32, reg=0.05, iters=15) -> np.ndarray:
@@ -47,8 +47,10 @@ def main() -> None:
     te = cand[cand.user_id.isin(test_users)].copy()
     tr = cand[cand.user_id.isin(train_users)].copy()
     n_pos = positives_per_user(d["labels"], test_users)
+    retrieval = candidate_metrics(te, n_pos)
     print(f"candidates: {len(cand):,} pairs, {cand.label.mean():.3%} positive; "
           f"train users {len(train_users):,}, test users {len(test_users):,}")
+    print("candidate retrieval:", {k: round(v, 4) for k, v in retrieval.items()})
     rows, importances = [], None
 
     def report(name, scores, seconds, probs=None):
@@ -80,6 +82,14 @@ def main() -> None:
     res = pd.DataFrame(rows)
     REPORTS.mkdir(exist_ok=True)
     md = ["# Results — held-out users, aisles ranked for each user's next order\n",
+          "## Candidate retrieval\n",
+          pd.DataFrame([retrieval]).to_markdown(index=False, floatfmt=".4f"),
+          "\nCandidate recall is the mean fraction of each user's true next-order aisles "
+          "present in the candidate set, before ranking. It bounds recall@k from above. "
+          "Candidate hit rate is the fraction of users with at least one positive candidate; "
+          "candidates per user is the mean list size. All evaluation users are included, "
+          "even those with no candidates; users without positives contribute zero recall.\n",
+          "## Ranking quality\n",
           res.to_markdown(index=False, floatfmt=".4f"),
           "\n## LightGBM feature importance (gain)\n",
           importances.head(15).to_frame("gain").to_markdown(floatfmt=".0f")]

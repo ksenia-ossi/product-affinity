@@ -5,8 +5,8 @@ End-to-end recommender pipeline on the public
 (3.4M orders, 206k users, 50k products in 134 aisles / 21 departments, 34M order lines).
 
 **Business question:** given a user's purchase history, how strongly is she attracted to each
-product category (*aisle*)? Ranking the 134 aisles per user is the building block behind
-"recommend a category / brand to this user" and category-level ad targeting.
+product category (*aisle*)? Ranking candidate aisles from a catalogue of 134 categories is the
+building block behind "recommend a category / brand to this user" and category-level ad targeting.
 
 ```
 CSVs ──> PostgreSQL (COPY, SQL exploration + aggregation) ──> parquet ──> pandas EDA ──> candidates ──> rankers ──> top-k metrics
@@ -22,6 +22,22 @@ CSVs ──> PostgreSQL (COPY, SQL exploration + aggregation) ──> parquet �
 | LightGBM on history + recency + popularity    | **0.529**   | **0.594** | **0.626** | **0.963** | 0.832 |
 
 Full tables: [reports/metrics.md](reports/metrics.md) · SQL: [reports/sql_exploration.md](reports/sql_exploration.md) · EDA: [reports/eda.md](reports/eda.md)
+
+### Candidate retrieval vs ranking
+
+Each user's candidate set is the union of their historical aisles and the top-20 popular
+aisles, not necessarily all 134 categories. A ranker cannot recover a relevant aisle that
+never entered this set. On the next `make train` run, the report also includes:
+
+- **Candidate recall:** the mean fraction of each user's true next-order aisles found in
+  the candidate set. This is an upper bound on recall@k, not an achieved ranking score.
+- **Candidate hit rate:** the fraction of held-out users with at least one positive candidate.
+- **Candidates per user:** the mean candidate list size, to make the retrieval cost visible.
+
+These metrics weight users equally and include users without candidates. Users without
+positive labels contribute zero candidate recall. This separates retrieval losses from
+ranking losses and helps evaluate the trade-off when changing the number of popular candidates.
+The saved results above predate these diagnostics; no new full-dataset run is claimed here.
 
 ![P(buy aisle next) vs history](reports/figures/history_vs_label.png)
 
@@ -55,7 +71,7 @@ src/affinity/
                   feature SQL -> parquet
   sql/            schema.sql, explore.sql, features.sql (user x aisle history/recency aggregates)
   features.py     candidate generation (history ∪ top-20 popular), user-level split, labels
-  metrics.py      precision@k, recall@k, NDCG@k, hit-rate@k
+  metrics.py      candidate recall/coverage/size; precision@k, recall@k, NDCG@k, hit-rate@k
   eda.py          pandas/Matplotlib EDA -> reports/eda.md + figures
   train.py        popularity, user-history, ALS, LightGBM; results table + figures
 tests/            pytest for metrics and candidate construction
