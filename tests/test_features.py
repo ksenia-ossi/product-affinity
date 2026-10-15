@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from affinity.features import FEATURES, build_candidates, positives_per_user, split_users
+from affinity.metrics import candidate_metrics
 
 
 def _data():
@@ -45,3 +46,14 @@ def test_split_users_is_disjoint_and_deterministic():
     a2, _ = split_users(ids, 0.2, seed=1)
     assert len(set(a) & set(b)) == 0 and len(a) + len(b) == 1000 and (a == a2).all()
     assert 150 < len(b) < 250
+
+
+def test_candidate_recall_improves_when_popular_pool_recovers_a_positive():
+    data = _data()
+    n_pos = positives_per_user(data["labels"], data["users"]["user_id"])
+    narrow = candidate_metrics(build_candidates(data, n_popular=1), n_pos)
+    wider = candidate_metrics(build_candidates(data, n_popular=2), n_pos)
+    assert narrow["candidate_recall"] == 0.25
+    assert wider["candidate_recall"] == 0.5
+    assert wider["candidates_per_user"] > narrow["candidates_per_user"]
+    assert wider["candidate_hit_rate"] == narrow["candidate_hit_rate"] == 0.5
