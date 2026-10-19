@@ -75,7 +75,7 @@ def main() -> None:
                              subsample=0.8, subsample_freq=1, colsample_bytree=0.8, random_state=SEED, verbose=-1)
     X_cols = FEATURES + ["aisle_id"]
     clf.fit(tr[X_cols], tr.label, categorical_feature=CATEGORICAL)
-    p = clf.predict_proba(te[X_cols])[:, 1]
+    p = np.asarray(clf.predict_proba(te[X_cols]))[:, 1]
     report("LightGBM (history + popularity + context)", p, time.time() - t, probs=p)
     importances = pd.Series(clf.booster_.feature_importance("gain"), index=X_cols).sort_values(ascending=False)
 
