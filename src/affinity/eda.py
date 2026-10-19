@@ -3,7 +3,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 from .config import FIGURES, REPORTS
@@ -18,7 +17,7 @@ def main() -> None:
 
     # 1. History length
     fig, ax = plt.subplots(figsize=(6, 3.2))
-    ax.hist(users["u_n_orders"], bins=np.arange(3, 101, 1), color="#4c72b0")
+    ax.hist(users["u_n_orders"], bins=range(3, 101), color="#4c72b0")
     ax.set(xlabel="orders in history", ylabel="users", title="History length per user (median %.0f)" % users.u_n_orders.median())
     fig.tight_layout(); fig.savefig(FIGURES / "history_length.png", dpi=120); plt.close(fig)
 

@@ -75,13 +75,14 @@ def main() -> None:
                              subsample=0.8, subsample_freq=1, colsample_bytree=0.8, random_state=SEED, verbose=-1)
     X_cols = FEATURES + ["aisle_id"]
     clf.fit(tr[X_cols], tr.label, categorical_feature=CATEGORICAL)
-    p = clf.predict_proba(te[X_cols])[:, 1]
+    p = np.asarray(clf.predict_proba(te[X_cols]))[:, 1]
     report("LightGBM (history + popularity + context)", p, time.time() - t, probs=p)
     importances = pd.Series(clf.booster_.feature_importance("gain"), index=X_cols).sort_values(ascending=False)
 
     res = pd.DataFrame(rows)
-    REPORTS.mkdir(exist_ok=True)
-    md = ["# Results — held-out users, aisles ranked for each user's next order\n",
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    FIGURES.mkdir(parents=True, exist_ok=True)
+    md = ["# Results: held-out users, aisles ranked for each user's next order\n",
           "## Candidate retrieval\n",
           pd.DataFrame([retrieval]).to_markdown(index=False, floatfmt=".4f"),
           "\nCandidate recall is the mean fraction of each user's true next-order aisles "

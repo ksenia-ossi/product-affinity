@@ -1,7 +1,7 @@
 PY ?= python3
 export PYTHONPATH := src
 
-.PHONY: data db-up db-load sql features eda train test all
+.PHONY: data db-up db-load sql features eda train lint typecheck test check all
 
 data:            ## download the Instacart 2017 dataset (~700 MB) from the Hugging Face mirror
 	$(PY) -m affinity.download
@@ -25,6 +25,14 @@ train:           ## popularity / user-history / ALS / LightGBM rankers -> report
 	$(PY) -m affinity.train
 
 test:
-	$(PY) -m pytest -q
+	OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 $(PY) -m pytest -q
+
+lint:
+	$(PY) -m flake8 --select=E9,F src tests
+
+typecheck:
+	$(PY) -m mypy --check-untyped-defs --ignore-missing-imports src tests
+
+check: lint typecheck test
 
 all: data db-load sql features eda train test
