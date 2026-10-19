@@ -8,6 +8,7 @@ Usage: python -m affinity.db load | explore | features
 import re
 import sys
 import warnings
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -75,4 +76,5 @@ def features() -> None:
 
 
 if __name__ == "__main__":
-    {"load": load, "explore": explore, "features": features}[sys.argv[1]]()
+    commands: dict[str, Callable[[], None]] = {"load": load, "explore": explore, "features": features}
+    commands[sys.argv[1]]()

@@ -1,4 +1,6 @@
-# Product-category affinity prediction — which categories will a user buy next?
+# Product-category affinity prediction: which categories will a user buy next?
+
+[![Checks](https://github.com/ksenia-ossi/product-affinity/actions/workflows/checks.yml/badge.svg)](https://github.com/ksenia-ossi/product-affinity/actions/workflows/checks.yml)
 
 End-to-end recommender pipeline on the public
 [Instacart Online Grocery Shopping Dataset 2017](https://www.kaggle.com/c/instacart-market-basket-analysis)
@@ -92,6 +94,25 @@ make test
 ```
 
 Requires Python ≥ 3.10 and Docker (for PostgreSQL). Peak RAM ≈ 5 GB.
+
+## Development checks
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+make check PY=.venv/bin/python
+```
+
+GitHub Actions runs the same lint, type and pytest checks on Python 3.10 and 3.12 for
+pull requests and pushes to `main`. No dataset download, database or credentials are needed.
+The lint check covers Python errors and unused imports, not code formatting; type checking
+includes untyped function bodies but skips unavailable third-party stubs.
+
+Tests cover candidate construction, user-level splitting, retrieval and ranking metrics,
+and report generation. A small synthetic-parquet smoke test exercises candidate generation,
+all four rankers and output files in a temporary directory. It checks that the pipeline runs
+after SQL aggregation, not model quality or PostgreSQL ingestion. Synthetic scores are never
+published as benchmark results, and the saved Instacart reports are not overwritten.
 
 ## Next steps
 

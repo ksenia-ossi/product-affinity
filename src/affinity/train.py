@@ -80,8 +80,9 @@ def main() -> None:
     importances = pd.Series(clf.booster_.feature_importance("gain"), index=X_cols).sort_values(ascending=False)
 
     res = pd.DataFrame(rows)
-    REPORTS.mkdir(exist_ok=True)
-    md = ["# Results — held-out users, aisles ranked for each user's next order\n",
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    FIGURES.mkdir(parents=True, exist_ok=True)
+    md = ["# Results: held-out users, aisles ranked for each user's next order\n",
           "## Candidate retrieval\n",
           pd.DataFrame([retrieval]).to_markdown(index=False, floatfmt=".4f"),
           "\nCandidate recall is the mean fraction of each user's true next-order aisles "
