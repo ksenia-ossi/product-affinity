@@ -89,11 +89,26 @@ make db-load     # docker compose up + schema + COPY into PostgreSQL
 make sql         # exploration queries -> reports/sql_exploration.md
 make features    # SQL aggregation -> data/processed/*.parquet (~1.5 min)
 make eda         # figures + reports/eda.md
-make train       # four rankers -> reports/metrics.md (~1 min on 8 cores)
+make train       # four rankers -> reports/metrics.md + an MLflow run (~1 min on 8 cores)
+make mlflow-ui   # compare logged runs at http://127.0.0.1:5000
 make test
 ```
 
 Requires Python ≥ 3.10 and Docker (for PostgreSQL). Peak RAM ≈ 5 GB.
+
+## Experiment tracking (MLflow)
+
+Each `make train` is logged as one MLflow run named `rankers` in the `product-affinity`
+experiment, stored locally in `mlflow.db` (SQLite) and `mlruns/` (artifacts), both git-ignored.
+
+- **Parent run:** split settings, candidate-retrieval metrics, `metrics.md` and the figures.
+- **One nested run per ranker:** its hyperparameters and metrics (`precision_at_5`, `ndcg_at_10`, ...;
+  MLflow metric names cannot contain `@`). AUC and log-loss are logged for LightGBM.
+- **LightGBM model:** saved with `mlflow.lightgbm` and an input example, so a logged version can be
+  loaded back with `mlflow.lightgbm.load_model`.
+
+`make mlflow-ui` opens the run list, where runs can be compared after changing a hyperparameter.
+Set `MLFLOW_TRACKING_URI` to log to another tracking server instead of the local file.
 
 ## Development checks
 
@@ -109,7 +124,7 @@ The lint check covers Python errors and unused imports, not code formatting; typ
 includes untyped function bodies but skips unavailable third-party stubs.
 
 Tests cover candidate construction, user-level splitting, retrieval and ranking metrics,
-and report generation. A small synthetic-parquet smoke test exercises candidate generation,
+and report generation, including the MLflow runs logged by training. A small synthetic-parquet smoke test exercises candidate generation,
 all four rankers and output files in a temporary directory. It checks that the pipeline runs
 after SQL aggregation, not model quality or PostgreSQL ingestion. Synthetic scores are never
 published as benchmark results, and the saved Instacart reports are not overwritten.
