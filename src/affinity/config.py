@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,3 +23,7 @@ K_EVAL = (5, 10)          # cut-offs for precision@k / recall@k / NDCG@k
 N_POPULAR_CANDIDATES = 20  # popular aisles added to every user's candidate list
 USER_TEST_FRACTION = 0.2   # users held out for evaluation (split by user, not by row)
 SEED = 42
+
+# Every `make train` is recorded as an MLflow run: parameters, metrics, report, figures, LightGBM model.
+MLFLOW_TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", f"sqlite:///{ROOT / 'mlflow.db'}")
+MLFLOW_EXPERIMENT = "product-affinity"

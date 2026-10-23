@@ -1,3 +1,4 @@
+import mlflow
 import numpy as np
 import pandas as pd
 
@@ -94,3 +95,21 @@ def test_training_pipeline_from_synthetic_parquet(monkeypatch, tmp_path):
         assert all(0 <= float(value) <= 1 for value in cells)
     for name in ("precision_at_k.png", "feature_importance.png"):
         assert (figures_dir / name).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_training_run_is_logged_to_mlflow(monkeypatch, tmp_path):
+    test_training_pipeline_from_synthetic_parquet(monkeypatch, tmp_path)
+
+    mlflow.set_tracking_uri(train.MLFLOW_TRACKING_URI)
+    runs = mlflow.search_runs(experiment_names=[train.MLFLOW_EXPERIMENT], output_format="list")
+    by_name = {run.info.run_name: run for run in runs}
+    assert set(by_name) == {"rankers", "popularity", "user history (order share)",
+                            "ALS matrix factorisation", "LightGBM (history + popularity + context)"}
+    lgbm = by_name["LightGBM (history + popularity + context)"]
+    assert lgbm.data.tags["mlflow.parentRunId"] == by_name["rankers"].info.run_id
+    assert lgbm.data.params["num_leaves"] == "63"
+    assert {"ndcg_at_10", "precision_at_5", "auc", "log_loss"} <= set(lgbm.data.metrics)
+    assert "candidate_recall" in by_name["rankers"].data.metrics
+    artifacts = {a.path for a in mlflow.MlflowClient().list_artifacts(by_name["rankers"].info.run_id)}
+    assert {"metrics.md", "figures"} <= artifacts
+    assert mlflow.search_logged_models(experiment_ids=[runs[0].info.experiment_id], output_format="list")
