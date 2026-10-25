@@ -24,7 +24,7 @@ from sklearn.metrics import log_loss, roc_auc_score
 
 from .config import (FIGURES, K_EVAL, MLFLOW_EXPERIMENT, MLFLOW_TRACKING_URI, N_POPULAR_CANDIDATES, REPORTS, SEED,
                      USER_TEST_FRACTION)
-from .features import CATEGORICAL, FEATURES, build_candidates, load_processed, positives_per_user, split_users
+from .features import CATEGORICAL, MODEL_COLUMNS, build_candidates, load_processed, positives_per_user, split_users
 from .metrics import candidate_metrics, evaluate
 
 
@@ -99,7 +99,7 @@ def run() -> None:
     lgb_params: dict[str, Any] = dict(n_estimators=400, learning_rate=0.05, num_leaves=63, min_child_samples=100,
                                       subsample=0.8, subsample_freq=1, colsample_bytree=0.8)
     clf = lgb.LGBMClassifier(**lgb_params, random_state=SEED, verbose=-1)
-    X_cols = FEATURES + ["aisle_id"]
+    X_cols = MODEL_COLUMNS
     clf.fit(tr[X_cols], tr.label, categorical_feature=CATEGORICAL)
     p = np.asarray(clf.predict_proba(te[X_cols]))[:, 1]
     report("LightGBM (history + popularity + context)", p, time.time() - t, probs=p,

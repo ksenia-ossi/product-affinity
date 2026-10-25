@@ -18,6 +18,7 @@ USER_COLS = ["u_n_orders", "u_avg_items", "u_avg_aisles", "u_avg_days_between",
 AISLE_COLS = ["a_order_share", "a_n_users", "a_reorder_rate", "department_id"]
 FEATURES = UA_COLS + ["ua_seen", "ua_recency_ratio"] + USER_COLS + AISLE_COLS
 CATEGORICAL = ["department_id", "aisle_id"]
+MODEL_COLUMNS = FEATURES + ["aisle_id"]  # LightGBM input, in training order
 
 
 def load_processed() -> dict[str, pd.DataFrame]:
