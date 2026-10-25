@@ -1,7 +1,7 @@
 PY ?= python3
 export PYTHONPATH := src
 
-.PHONY: data db-up db-load sql features eda train mlflow-ui lint typecheck test check all
+.PHONY: data db-up db-load sql features eda train mlflow-ui serve lint typecheck test check all
 
 data:            ## download the Instacart 2017 dataset (~700 MB) from the Hugging Face mirror
 	$(PY) -m affinity.download
@@ -26,6 +26,9 @@ train:           ## popularity / user-history / ALS / LightGBM rankers -> report
 
 mlflow-ui:       ## browse logged runs at http://127.0.0.1:5000
 	$(PY) -m mlflow ui --backend-store-uri sqlite:///mlflow.db
+
+serve:           ## REST API ranking aisles with the latest logged LightGBM model, docs at http://127.0.0.1:8000/docs
+	$(PY) -m uvicorn affinity.serve:app --port 8000
 
 test:
 	OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 $(PY) -m pytest -q

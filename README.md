@@ -76,7 +76,8 @@ src/affinity/
   metrics.py      candidate recall/coverage/size; precision@k, recall@k, NDCG@k, hit-rate@k
   eda.py          pandas/Matplotlib EDA -> reports/eda.md + figures
   train.py        popularity, user-history, ALS, LightGBM; results table + figures
-tests/            pytest for metrics and candidate construction
+  serve.py        FastAPI app: loads the logged LightGBM model from MLflow, ranks candidate aisles
+tests/            pytest for metrics, candidate construction, training and the API
 reports/          generated tables and figures
 ```
 
@@ -91,6 +92,7 @@ make features    # SQL aggregation -> data/processed/*.parquet (~1.5 min)
 make eda         # figures + reports/eda.md
 make train       # four rankers -> reports/metrics.md + an MLflow run (~1 min on 8 cores)
 make mlflow-ui   # compare logged runs at http://127.0.0.1:5000
+make serve       # REST API with the latest logged LightGBM model, docs at http://127.0.0.1:8000/docs
 make test
 ```
 
@@ -110,6 +112,26 @@ experiment, stored locally in `mlflow.db` (SQLite) and `mlruns/` (artifacts), bo
 `make mlflow-ui` opens the run list, where runs can be compared after changing a hyperparameter.
 Set `MLFLOW_TRACKING_URI` to log to another tracking server instead of the local file.
 
+## Serving the model (FastAPI)
+
+`make serve` starts a small REST API. At startup it loads the most recent LightGBM model logged
+by `make train` from MLflow (or the one in `MODEL_URI`, e.g. `models:/m-...`), so the API always
+serves a model whose parameters and metrics can be looked up in the MLflow UI.
+
+- `GET /health`: status and the URI of the loaded model.
+- `POST /rank`: takes a user's candidate aisles, one object per aisle with every model feature
+  (the columns of `MODEL_COLUMNS` in `features.py`, including `aisle_id`), and returns the top `k`
+  aisles sorted by predicted probability of being in the next order.
+
+```bash
+curl -X POST http://127.0.0.1:8000/rank -H 'Content-Type: application/json' \
+     -d '{"k": 3, "candidates": [{"aisle_id": 24, "department_id": 4, "ua_order_share": 0.8, ...}, ...]}'
+```
+
+A request with a missing feature is rejected with HTTP 422 and the list of missing columns.
+The API does not compute features itself: the caller sends the same per-candidate features
+that `features.py` builds from the SQL aggregates.
+
 ## Development checks
 
 ```bash
@@ -124,7 +146,8 @@ The lint check covers Python errors and unused imports, not code formatting; typ
 includes untyped function bodies but skips unavailable third-party stubs.
 
 Tests cover candidate construction, user-level splitting, retrieval and ranking metrics,
-and report generation, including the MLflow runs logged by training. A small synthetic-parquet smoke test exercises candidate generation,
+and report generation, including the MLflow runs logged by training. API tests log a small model
+to a temporary MLflow store and call `/health` and `/rank` through FastAPI's test client. A small synthetic-parquet smoke test exercises candidate generation,
 all four rankers and output files in a temporary directory. It checks that the pipeline runs
 after SQL aggregation, not model quality or PostgreSQL ingestion. Synthetic scores are never
 published as benchmark results, and the saved Instacart reports are not overwritten.
